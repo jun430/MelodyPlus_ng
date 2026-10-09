@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        高权限方法（导出/清空日志、调试弹窗注入）所需的自定义权限。
+        protectionLevel=signature：仅同签名应用可被授予。模块自身（下方 uses-permission）
+        持有该权限；宿主 App（com.oplus.melody / 蓝牙栈）不同签名、不含该权限 →
+        这些方法对宿主物理不可达，构成运行时白名单之外的第二道静态防线。
+    -->
+    <permission
+        android:name="com.melody.melodyplus.permission.ACCESS_REGISTRY"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.melody.melodyplus.permission.ACCESS_REGISTRY" />
+
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!--
+        「所有文件访问」权限（Android 11+ / API 30+）：**仅用于旧版绑定的一次性迁移**。
+        绑定落盘已改为模块私有目录 files/bindings/（无需任何存储权限）；
+        但旧版曾把绑定写在公共目录 Download/MelodyPlus/bindings/（目录 0770、属 media_rw），
+        迁移读取该目录需本权限。未授权时跳过迁移（新装用户无遗留绑定，无影响）。
+        运行时不再向用户申请；本权限仅保留迁移能力。
+    -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false" />
+
+    <!--
+        forceQueryable（API 30+，application 级）：允许任意应用解析本应用的 Provider，
+        跳过 Android 11+ 包可见性过滤（不应写在 <provider> 上——那会被 PackageParser 忽略）。
+        必需 —— 宿主 melody 进程 targetSdk 36 的 queriesPackages 白名单不含本模块，实测反复出现：
+            E ActivityThread: Failed to find provider info for com.melody.melodyplus.registry
+            userDeviceImageBytes failed ... Unknown authority com.melody.melodyplus.registry
+        → 用户自定义图 / 绑定 / 日志跨进程读取全部静默失败。
+        安全性由 Provider 侧双层防护兜底：① caller UID/包名白名单（RegistryCallerPolicy）；
+        ② 高权限方法额外要求 signature 级 ACCESS_REGISTRY 权限。
+    -->
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:forceQueryable="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MelodyPlus">
+
+        <!-- LSPosed 模块声明：缺了这些 LSPosed 不识别本应用为模块 -->
+        <meta-data android:name="xposedmodule" android:value="true" />
+        <meta-data android:name="xposedminversion" android:value="82" />
+        <meta-data android:name="xposeddescription" android:value="让第三方耳机支持OPPO系统蓝牙弹窗" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.MelodyPlus">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <!--
+            forceQueryable（API 30+）：允许任意应用（含未在 <queries> 声明本模块的宿主）
+            解析本 Provider。必需 —— 宿主 melody 进程 targetSdk 35+ 受 Android 11+
+            包可见性过滤，实测日志反复出现：
+                E ActivityThread: Failed to find provider info for com.melody.melodyplus.registry
+            → 用户自定义图 / 绑定 / 日志跨进程读取全部静默失败。
+            此属性使系统跳过对该 Provider 的可见性过滤，contentResolver.call 直达。
+        -->
+        <provider
+            android:name=".bridge.DeviceRegistryProvider"
+            android:authorities="com.melody.melodyplus.registry"
+            android:exported="true"
+            android:forceQueryable="true" />
+    </application>
+
+</manifest>

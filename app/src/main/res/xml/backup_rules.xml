@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  备份分类规则（fullBackupContent，作用于 Android 12 以下 / API < 31）。
+
+  分类原则（与 PLAN Phase 3-D 一致）：
+  - 可迁移（MIGRATE）：纯 UI 偏好，换机后语义不变 → module_ui_config。
+  - 设备本地（DEVICE_LOCAL，全部排除）：
+      · module_device_registry / mac_profile_cache  真实 MAC、型号绑定真值（换机即失效）
+      · module_hook_status                          Hook 运行态（设备/宿主相关）
+      · module_hook_logs                            诊断日志（体积大、含设备信息）
+  - 外部绑定文件（/sdcard/Download/MelodyPlus/**）不在应用沙箱内，本规则天然不覆盖。
+
+  注意：一旦出现 <include>，未列出的项默认不再备份；此处仍显式列出 <exclude> 以免语义被误读。
+  修改本文件前请先补充迁移测试与旧版本回滚方案。
+-->
+<full-backup-content>
+    <include
+        domain="sharedpref"
+        path="module_ui_config.xml" />
+    <exclude
+        domain="sharedpref"
+        path="module_device_registry.xml" />
+    <exclude
+        domain="sharedpref"
+        path="mac_profile_cache.xml" />
+    <exclude
+        domain="sharedpref"
+        path="module_hook_status.xml" />
+    <exclude
+        domain="sharedpref"
+        path="module_hook_logs.xml" />
+    <!-- 模块自身不落 files/database；显式排除以避免将来误纳入。 -->
+    <exclude domain="file" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>

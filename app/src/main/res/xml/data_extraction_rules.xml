@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  备份分类规则（dataExtractionRules，作用于 Android 12+ / API >= 31）。
+
+  cloud-backup 与 device-transfer 采用同一分类：
+  - 可迁移（MIGRATE）：module_ui_config（纯 UI 偏好，换机后语义不变）。
+  - 设备本地（DEVICE_LOCAL，全部排除）：
+      · module_device_registry / mac_profile_cache  真实 MAC、型号绑定真值
+      · module_hook_status                          Hook 运行态
+      · module_hook_logs                            诊断日志
+  - 外部绑定文件（/sdcard/Download/MelodyPlus/**）不在沙箱内，天然不参与。
+
+  与 API <31 的 backup_rules.xml 保持等价语义；
+  Android 12+ 与 device-transfer 的差异：本模块无跨版本需要迁移的 schema，
+  故两条链路规则一致。修改前先补迁移测试与回滚方案。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include
+            domain="sharedpref"
+            path="module_ui_config.xml" />
+        <exclude
+            domain="sharedpref"
+            path="module_device_registry.xml" />
+        <exclude
+            domain="sharedpref"
+            path="mac_profile_cache.xml" />
+        <exclude
+            domain="sharedpref"
+            path="module_hook_status.xml" />
+        <exclude
+            domain="sharedpref"
+            path="module_hook_logs.xml" />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include
+            domain="sharedpref"
+            path="module_ui_config.xml" />
+        <exclude
+            domain="sharedpref"
+            path="module_device_registry.xml" />
+        <exclude
+            domain="sharedpref"
+            path="mac_profile_cache.xml" />
+        <exclude
+            domain="sharedpref"
+            path="module_hook_status.xml" />
+        <exclude
+            domain="sharedpref"
+            path="module_hook_logs.xml" />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

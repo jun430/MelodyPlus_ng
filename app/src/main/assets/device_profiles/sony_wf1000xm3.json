@@ -1,0 +1,38 @@
+{
+  "id": "sony.wf1000xm3",
+  "vendor": "sony",
+  "displayName": "Sony WF-1000XM3",
+  "modelId": "WF1000XM3",
+  "adapter": "sony",
+  "transport": {
+    "type": "rfcomm",
+    "protocolVersion": "v2",
+    "uuid": "956c7b26-d49a-4ba8-b03f-b17d393cb6e2",
+    "connectTimeoutMs": 8000,
+    "commandTimeoutMs": 5000
+  },
+  "match": {
+    "nameRegex": "^WF-1000XM3$",
+    "requiredServiceUuids": [
+      "956c7b26-d49a-4ba8-b03f-b17d393cb6e2"
+    ],
+    "manualBindRequired": false
+  },
+  "capabilities": {
+    "ancModes": ["OFF", "NOISE_CANCELLING", "TRANSPARENCY", "WIND_REDUCTION"],
+    "ambientLevel": true,
+    "batteryDual": true,
+    "batteryCase": true,
+    "batterySingle": false,
+    "caseBattery": true,
+    "singleBattery": false,
+    "dsee": true
+  },
+  "uiFeatures": {
+    "noiseReductionStrength": false,
+    "multiDeviceConnect": false,
+    "personalizedNoise": false,
+    "customEq": false,
+    "smartBluetooth": false
+  }
+}
