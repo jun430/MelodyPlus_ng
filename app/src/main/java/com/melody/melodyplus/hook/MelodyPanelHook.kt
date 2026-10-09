@@ -31,6 +31,7 @@ import android.widget.Toast
 import com.melody.melodyplus.adapter.xiberia.XiberiaCommands
 import com.melody.melodyplus.adapter.xiberia.XiberiaModelProfiles
 import com.melody.melodyplus.adapter.xiberia.XiberiaProductCatalog
+import com.melody.melodyplus.adapter.xiberia.XiberiaProductCatalogHolder
 import com.melody.melodyplus.adapter.xiberia.XiberiaSpoof
 import com.melody.melodyplus.bridge.AdapterRegistry
 import com.melody.melodyplus.bridge.BluetoothAudioPopupGate
@@ -1716,6 +1717,8 @@ object MelodyPanelHook : HookContext() {
         //   由 bindActivePanelContext（mac 变化递增）保持不变。
         if (previousPid != productId) panelGeneration++
         activePanelProductId = productId
+        // [官方对齐·SET 门控] 同步型号给 adapter 层，供 supportsCommand 能力位门控。
+        XiberiaProductCatalogHolder.activeProductId = productId
         var created = 0
         var refreshed = 0
         items.forEachIndexed { index, item ->

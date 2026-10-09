@@ -81,6 +81,8 @@ class XiberiaRfcommClient(
     @Volatile private var connectedAtMs: Long = 0L
     /** 连续「已发出但无任何 RX」的命令计数；收到任意 RX 即清零。 */
     @Volatile private var consecutiveSilentTimeouts: Int = 0
+    /** 本链路目标设备 MAC（大写）；上报分发需带 MAC 归属。0 长度 = 未连接。 */
+    @Volatile private var currentMac: String = ""
     private val framer = XiberiaFrameCodec.StreamFramer()
 
     val isConnected: Boolean
@@ -113,6 +115,7 @@ class XiberiaRfcommClient(
             inputStream = s.inputStream
             outputStream = s.outputStream
             running = true
+            currentMac = device.address.uppercase()
             lastRxAt = System.currentTimeMillis()
             connectedAtMs = System.currentTimeMillis()
             consecutiveSilentTimeouts = 0
@@ -138,6 +141,7 @@ class XiberiaRfcommClient(
             lastRxAt = 0L
             connectedAtMs = 0L
             consecutiveSilentTimeouts = 0
+            currentMac = ""
             log("Disconnected")
         }
     }
@@ -314,9 +318,15 @@ class XiberiaRfcommClient(
             if (idx >= 0) responseWaiters.removeAt(idx) else null
         }
         waiter?.deferred?.complete(frame)
-        // key 未被 waiter 认领时，可在此加主动上报分发(电量推送等)
+        // [官方对齐·主动上报分发] 未被任何 waiter 认领的帧 = 设备主动推送（电量/开关/降噪/
+        //   接收器状态上报，官方 Protocol.parseReceiveData 按 cmd 分发）。
+        //   旧实现只打一条 "Unmatched RX" 日志丢弃 → 用户按物理键/摘戴耳机时模块状态不同步。
         if (waiter == null) {
-            log("Unmatched RX key=0x${key.toString(16)}")
+            val mac = currentMac
+            val dispatched = XiberiaReportDispatcher.dispatch(mac, key, pl)
+            if (!dispatched) {
+                log("Unmatched RX key=0x${key.toString(16)}")
+            }
         }
     }
 

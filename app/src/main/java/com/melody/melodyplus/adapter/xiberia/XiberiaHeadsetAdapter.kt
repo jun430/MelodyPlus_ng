@@ -252,6 +252,14 @@ class XiberiaHeadsetAdapter(
      * 成功后同步对应本地态（游戏模式 / LDAC / 漏音抑制），供 [currentMode]/[readState] 复用。
      */
     private suspend fun setFeatureSwitch(cmd: Int, enabled: Boolean): CommandResult {
+        // [官方对齐·能力位门控] 动态面板路径必须按型号能力位放行（官方 DeviceActivity 只对
+        //   isSupportXxx()==true 的项发 SET）；未识别/未开放型号或该项不属于该型号 → 拒发。
+        //   activeProductId 未知（0）时放行（兼容旧的直写路径，避免误伤未绑定型号的调用）。
+        val pid = XiberiaProductCatalogHolder.activeProductId
+        if (pid != 0 && !XiberiaProductCatalog.supportsCommand(pid, cmd)) {
+            modLog("W", "XIBERIA_GATE reject SET cmd=0x${cmd.toString(16)} for productId=0x${pid.toString(16)}")
+            return CommandResult.Unsupported("Command 0x${cmd.toString(16)} not supported by product 0x${pid.toString(16)}")
+        }
         if (!writeSwitch(cmd, enabled)) {
             return CommandResult.Failed("Feature 0x${cmd.toString(16)} set failed")
         }
@@ -270,6 +278,12 @@ class XiberiaHeadsetAdapter(
      */
     private suspend fun setFeatureLevel(cmd: Int, level: Int): CommandResult {
         val mac = boundMac ?: return CommandResult.Failed("No session for level write")
+        // [官方对齐·能力位门控] 同 setFeatureSwitch：动态面板的档位写也按型号能力位放行。
+        val pid = XiberiaProductCatalogHolder.activeProductId
+        if (pid != 0 && !XiberiaProductCatalog.supportsCommand(pid, cmd)) {
+            modLog("W", "XIBERIA_GATE reject LEVEL cmd=0x${cmd.toString(16)} for productId=0x${pid.toString(16)}")
+            return CommandResult.Unsupported("Command 0x${cmd.toString(16)} not supported by product 0x${pid.toString(16)}")
+        }
         val session = XiberiaFeatureBackendHolder.backend.existingSession(mac)
             ?: return CommandResult.Failed("No session for 0x${cmd.toString(16)}")
         val ack = runCatching {
@@ -351,4 +365,16 @@ class XiberiaHeadsetAdapter(
 /** 进程内共享的 XIBERIA backend 单例（对应参考模块的全局 backend 持有）。 */
 internal object XiberiaFeatureBackendHolder {
     val backend: XiberiaFeatureBackend by lazy { XiberiaFeatureBackend() }
+}
+
+/**
+ * 进程内共享的「当前面板型号」持有者。
+ *
+ * 用途：adapter（写路径）需要按型号能力位做门控（[XiberiaProductCatalog.supportsCommand]），
+ * 但型号由 hook 层（`MelodyPanelHook.activePanelProductId`）在面板注入时确定。
+ * hook 层注入面板时同步写入本 holder，adapter 读取；
+ * **0 = 未知型号**（不门控，兼容未绑定/未注入面板的旧路径）。
+ */
+internal object XiberiaProductCatalogHolder {
+    @Volatile var activeProductId: Int = 0
 }

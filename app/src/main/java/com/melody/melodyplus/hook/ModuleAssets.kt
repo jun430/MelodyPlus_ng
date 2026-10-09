@@ -46,6 +46,22 @@ object ModuleAssets {
         return null
     }
 
+    /**
+     * 通用模块 assets 读取（相对路径，如 `xiberia_eq/bg_2.png`）。
+     *
+     * 与 [readBuiltinImage] 同一套寻址（modulePath → ClassLoader 反推），
+     * 供 EQ 素材等非型号图片使用。
+     */
+    fun readAsset(relativePath: String): ByteArray? {
+        val entryName = "assets/$relativePath"
+        modulePath?.let { readFromZip(it, entryName)?.let { bytes -> return bytes } }
+        moduleApkFromClassLoader()?.let { p ->
+            if (p != modulePath) modulePath = p
+            readFromZip(p, entryName)?.let { return it }
+        }
+        return null
+    }
+
     private fun readFromZip(apk: String, entryName: String): ByteArray? = runCatching {
         ZipFile(apk).use { zip ->
             val entry = zip.getEntry(entryName) ?: return null

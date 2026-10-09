@@ -595,6 +595,24 @@ object XiberiaProductCatalog {
                     )
                 }
             }
+            // 降噪「风格」档（官方 supportNoiseStyle() 仅 DM03 为 true；与 NOISE_SET 档位是两个维度）
+            if (c.supportNoiseStyle) {
+                add(
+                    PanelItem(
+                        key = "melodyplus_xi_noise_style",
+                        title = "降噪风格",
+                        summary = "切换降噪的风格档位",
+                        kind = Kind.CHOICE,
+                        cmdSet = XiberiaCommands.NOISE_STYLE_SET,        // 0x0E1F
+                        cmdGet = XiberiaCommands.NOISE_STYLE_GET,        // 0x0E20
+                        choices = listOf(
+                            PanelItem.Choice("深度降噪", 0x01),
+                            PanelItem.Choice("均衡", 0x02),
+                            PanelItem.Choice("舒适", 0x03),
+                        ),
+                    ),
+                )
+            }
             if (c.spatialSound) {
                 add(
                     PanelItem(
@@ -686,7 +704,8 @@ object XiberiaProductCatalog {
                         title = "接收器状态",
                         summary = "Dongle 接收器状态查询",
                         kind = Kind.SWITCH,
-                        cmdSet = null,                                   // 官方仅 0x0E25 查询，无 SET
+                        cmdSet = null,                                   // 官方仅查询，无 SET
+                        cmdGet = XiberiaCommands.DONGLE_STATE_GET_OR_REPORT, // 0x0E25
                     ),
                 )
             }
@@ -697,4 +716,54 @@ object XiberiaProductCatalog {
     const val PANEL_KEY_PREFIX: String = "melodyplus_xi_"
 
     fun isCatalogKey(key: String?): Boolean = key?.startsWith(PANEL_KEY_PREFIX) == true
+
+    // ==================================================================
+    // 五、命令级能力门控（SET 侧，对齐官方 DeviceActivity 的 isSupportXxx 过滤）
+    // ==================================================================
+
+    /**
+     * 与型号能力位**无关**的通用命令码（官方所有型号共用，不参与能力位门控）。
+     *
+     * 依据：官方 `DeviceActivity` 对这些命令直接下发，不查 `isSupportXxx()`；
+     * 它们只依赖设备身份 / EQ 子系统 / 电量子系统本身。
+     */
+    private val GENERIC_COMMANDS: Set<Int> = setOf(
+        XiberiaCommands.FW_VERSION,           // 0x0D01 版本（模块内命名 FW_VERSION）
+        XiberiaCommands.BATTERY,              // 0x0A01 电量
+        XiberiaCommands.BATTERY_ALT,          // 0x0A02
+        XiberiaCommands.BATTERY_REPORT,       // 0x0A11
+        XiberiaCommands.BATTERY_REPORT_ALT,   // 0x0A12
+        XiberiaCommands.EQ_ENABLE_SET,        // 0x0801
+        XiberiaCommands.EQ_ENABLE_GET,        // 0x0802
+        XiberiaCommands.EQ_MODE_SET,          // 0x0803
+        XiberiaCommands.EQ_MODE_GET,          // 0x0804
+        XiberiaCommands.EQ_CUSTOM,            // 0x0806
+        XiberiaCommands.USER_ALL_EQ_GET,      // 0x0807
+        XiberiaCommands.ALL_KEY_GET,          // 0x0314
+    )
+
+    /**
+     * 命令码 [command] 是否被型号 [productId] 的能力位放行（**SET / 查询通用门控**）。
+     *
+     * 对齐官方 `DeviceActivity`：只有 `Product.isSupportXxx()==true` 的项才发对应命令；
+     * 未识别型号 / 官方未开放型号（isSupport=false）**一律拒发**。
+     *
+     * 判定依据 = [panelItems] 中该型号已生成的项所携带的 cmdSet/cmdGet（面板项本身就是
+     * 按能力位生成的），再并上 [GENERIC_COMMANDS]。
+     *
+     * ⚠️ 注意：本门控只用于**动态面板**路径（按型号自适配的面板项读写）；
+     *    旧的 ANC 枚举复用路径（`SetAncMode`）不经过本门控，以免破坏既有语义。
+     */
+    fun supportsCommand(productId: Int, command: Int): Boolean {
+        val c = byProductId(productId) ?: return false
+        if (!c.supported) return false
+        if (command in GENERIC_COMMANDS) return true
+        return panelItems(productId).any { it.cmdSet == command || it.cmdGet == command }
+    }
+
+    /** 该型号支持的全部命令码（SET + GET，含通用码）。 */
+    fun supportedCommands(productId: Int): Set<Int> =
+        (panelItems(productId).flatMap { listOfNotNull(it.cmdSet, it.cmdGet) } + GENERIC_COMMANDS)
+            .filter { supportsCommand(productId, it) }
+            .toSet()
 }

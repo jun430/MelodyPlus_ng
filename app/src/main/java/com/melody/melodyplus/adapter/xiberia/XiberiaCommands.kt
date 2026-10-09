@@ -108,6 +108,28 @@ object XiberiaCommands {
     const val LEAK_SUPPRESS: Int = 0x0B01        // NOISE_SET
     const val LEAK_SUPPRESS_GET: Int = 0x0B02    // NOISE_GET
 
+    /** 官方 `CommandId.NOISE_SET` / `NOISE_GET` 原名（值同 [LEAK_SUPPRESS] / [LEAK_SUPPRESS_GET]）。 */
+    const val NOISE_SET: Int = 0x0B01
+    const val NOISE_GET: Int = 0x0B02
+
+    /**
+     * 【官方补齐】NOISE_REPORT `0x0B03` —— 降噪档位**设备主动上报**（非查询应答）。
+     *
+     * 官方 `CommandId.NOISE_REPORT`。设备在用户物理按键切换降噪时主动推此帧，
+     * 官方 `Protocol.parseReceiveData` 用它刷新 UI（避免 SET 后本地状态与设备不同步）。
+     */
+    const val NOISE_REPORT: Int = 0x0B03
+
+    /**
+     * 【官方补齐】NOISE_STYLE_SET `0x0E1F` / NOISE_STYLE_GET `0x0E20` —— 降噪「风格」。
+     *
+     * 官方 `Product.supportNoiseStyle()` **仅 DM03 覆写为 true**（`Product$DM03`），
+     * 语义 = 降噪的风格档（如「深度/均衡/舒适」类），与 [NOISE_SET] 的档位（降噪/通透）
+     * 是两个独立维度。无此能力的型号**不查、不显示**。
+     */
+    const val NOISE_STYLE_SET: Int = 0x0E1F
+    const val NOISE_STYLE_GET: Int = 0x0E20
+
     // ============ 官方语义别名（值同上表，仅命名对齐 CommandId，供 MC05 功能面板使用） ============
     /** 触控锁 / 触控功能（= KEY_FUNC_L/R）。 */
     const val TOUCH_SET: Int = 0x0E17
@@ -128,6 +150,16 @@ object XiberiaCommands {
     const val DUAL_DEVICE_SET: Int = 0x0E0B
     /** 音量档位官方命名（= TONE_LEVEL，4 档 0..3）。 */
     const val VOLUME_GEAR_SET: Int = 0x0E26
+    /** 音量档位读（官方 VOLUME_GEAR_GET）。 */
+    const val VOLUME_GEAR_GET_ALIAS: Int = 0x0E27
+
+    /**
+     * 【官方补齐】DONGLE_STATE_GET_OR_REPORT `0x0E25` —— Dongle 接收器状态（查询/上报同码）。
+     *
+     * 官方 `CommandId.DONGLE_STATE_GET_OR_REPORT`。仅 `Product.getDongle()==true` 的型号有此能力；
+     * 官方无独立 SET（状态由设备端决定），模块内为只读展示。
+     */
+    const val DONGLE_STATE_GET_OR_REPORT: Int = 0x0E25
 
     // ================= 提示音 / 音量档位 =================
     /** 音量档位（旧名「提示音档位」，码值 0x0E26 与官方 VOLUME_GEAR_SET 一致）。 */

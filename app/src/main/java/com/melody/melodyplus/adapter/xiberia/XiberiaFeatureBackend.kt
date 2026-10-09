@@ -234,6 +234,50 @@ class XiberiaFeatureBackend(
     }
 
     /**
+     * 【官方对齐】按型号能力位分发查询 —— 对齐 `DeviceActivity.readState()`。
+     *
+     * 官方语义：先 `Product.findProductById(modelInt)` 取型号，再对每个 `isSupportXxx()==true`
+     * 的项发对应 `cmdGet`；未支持项**根本不查**。本函数把该语义收敛为
+     * `XiberiaFeatureQueryPlan.planFor(productId)` 逐项回读。
+     *
+     * @param productId 官方 productId（0x101–0x118）；null / 未识别 → 返回空 Map（不查）。
+     * @return key → 解析值（BOOL: 0/1；LEVEL: 档位值；RAW: null 仅 dump）；无应答项不入 Map。
+     */
+    fun queryFeatureStates(mac: String, productId: Int?): CompletableFuture<Map<String, Int?>> =
+        supplyAsync {
+            val session = state(mac).session ?: return@supplyAsync emptyMap<String, Int?>()
+            val pid = productId ?: run {
+                modLog("I", "XIBERIA_QUERY_PLAN productId=null → 未识别型号，不查")
+                return@supplyAsync emptyMap<String, Int?>()
+            }
+            val plan = XiberiaFeatureQueryPlan.planFor(pid)
+            if (plan.isEmpty()) {
+                modLog("I", "XIBERIA_QUERY_PLAN productId=0x${pid.toString(16)} → 空计划（未识别/未开放型号，不查）")
+                return@supplyAsync emptyMap<String, Int?>()
+            }
+            modLog("I", "XIBERIA_QUERY_PLAN productId=0x${pid.toString(16)} " +
+                    "items=${plan.size} ${plan.joinToString { "${it.key}@0x${it.cmdGet.toString(16)}(${it.kind})" }}")
+            val out = LinkedHashMap<String, Int?>()
+            plan.forEach { q ->
+                val payload = runCatching { session.request(q.cmdGet) }.getOrNull()
+                modLog("I", "XIBERIA_QUERY_RAW key=${q.key} cmd=0x${q.cmdGet.toString(16)} " +
+                        "payload=${payload?.joinToString("") { "%02X".format(it) } ?: "null"}")
+                when (q.kind) {
+                    XiberiaFeatureQueryPlan.PayloadKind.BOOL ->
+                        payload?.takeIf { it.isNotEmpty() }?.let { out[q.key] = it[it.size - 1].toInt() and 0xFF }
+                    XiberiaFeatureQueryPlan.PayloadKind.LEVEL ->
+                        payload?.takeIf { it.isNotEmpty() }?.let { out[q.key] = it[it.size - 1].toInt() and 0xFF }
+                    XiberiaFeatureQueryPlan.PayloadKind.RAW -> Unit // 仅 dump，不入 Map
+                }
+            }
+            out
+        }
+
+    /** 按型号能力位写开关并校验（cmd 由 queried panel item 给出）。 */
+    fun setFeatureSwitchAndVerify(mac: String, command: Int, value: Boolean): CompletableFuture<Boolean> =
+        setControlAndVerify(mac, command, value)
+
+    /**
      * 查询控制状态（对应参考模块 queryControls）。
      *
      * ⚠️ 修正记录：原实现用 `0x0807`（= USER_ALL_EQ_GET / EQ 预设查询）当"设备全状态查询"，
